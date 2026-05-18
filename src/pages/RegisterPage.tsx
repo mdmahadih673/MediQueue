@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, User, Image, GraduationCap, CheckCircle, XCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Image, GraduationCap, CheckCircle, XCircle, Upload } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
+import api from '../utils/api';
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24">
@@ -22,6 +23,31 @@ const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState({ name: '', email: '', photoURL: '', password: '' });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file.');
+      return;
+    }
+    setUploadingPhoto(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const res = await api.post('/upload', { base64Data: reader.result, fileName: file.name });
+        const serverUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : window.location.origin;
+        updateField('photoURL', `${serverUrl}${res.data.fileUrl}`);
+        toast.success('Photo uploaded! 📸');
+      } catch {
+        toast.error('Failed to upload photo.');
+      } finally {
+        setUploadingPhoto(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => { if (user) navigate('/'); }, [user, navigate]);
 
@@ -146,20 +172,44 @@ const RegisterPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Photo URL */}
+          {/* Profile Photo Upload */}
           <div>
             <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
-              Photo URL <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
+              Profile Photo <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
             </label>
-            <div className="relative">
-              <Image size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                type="url"
-                className="input pl-10"
-                placeholder="https://example.com/photo.jpg"
-                value={formData.photoURL}
-                onChange={e => updateField('photoURL', e.target.value)}
-              />
+            <div className="flex items-center gap-3">
+              {formData.photoURL ? (
+                <img
+                  src={formData.photoURL}
+                  alt="Preview"
+                  className="w-12 h-12 rounded-xl object-cover"
+                  style={{ border: '2px solid rgba(168,85,247,0.4)' }}
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'var(--glass)', border: '1px solid var(--glass-border)' }}>
+                  <Image size={20} style={{ color: 'var(--text-muted)' }} />
+                </div>
+              )}
+              <label className="btn-neon text-xs py-2 px-4 flex items-center gap-2 cursor-pointer">
+                <Upload size={14} />
+                <span>{uploadingPhoto ? 'Uploading...' : 'Choose Photo'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePhotoUpload}
+                  disabled={uploadingPhoto}
+                />
+              </label>
+              {formData.photoURL && (
+                <button
+                  type="button"
+                  onClick={() => updateField('photoURL', '')}
+                  className="text-xs" style={{ color: '#ef4444' }}
+                >
+                  Remove
+                </button>
+              )}
             </div>
           </div>
 

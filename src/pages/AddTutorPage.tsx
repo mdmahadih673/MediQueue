@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   User, Image, BookOpen, Clock, DollarSign, Layers,
-  Calendar, Building, MapPin, Monitor, Hash, Plus
+  Calendar, Building, MapPin, Monitor, Hash, Plus, Upload
 } from 'lucide-react';
 import { subjects } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
@@ -113,7 +113,6 @@ const AddTutorPage: React.FC = () => {
       group: 'Personal Info',
       items: [
         { label: 'Tutor Name', field: 'tutorName', type: 'text', icon: <User size={16} />, placeholder: 'Dr. John Smith', required: true },
-        { label: 'Tutor Photo URL', field: 'tutorImage', type: 'url', icon: <Image size={16} />, placeholder: 'https://...', required: false },
         { label: 'Institution', field: 'institution', type: 'text', icon: <Building size={16} />, placeholder: 'Harvard University', required: false },
         { label: 'Experience', field: 'experience', type: 'text', icon: <Layers size={16} />, placeholder: '5 years', required: false },
       ]
@@ -173,6 +172,47 @@ const AddTutorPage: React.FC = () => {
               <h3 className="font-bold text-base mb-5" style={{ color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>
                 {group.group}
               </h3>
+
+              {/* Tutor Photo Upload - only in Personal Info group */}
+              {gi === 0 && (
+                <div className="mb-5">
+                  <label className="block text-xs font-medium mb-2" style={{ color: 'var(--text-muted)' }}>
+                    Tutor Photo <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
+                  </label>
+                  <div className="flex items-center gap-4">
+                    {form.tutorImage ? (
+                      <img
+                        src={form.tutorImage}
+                        alt="Preview"
+                        className="w-16 h-16 rounded-xl object-cover"
+                        style={{ border: '2px solid rgba(168,85,247,0.4)' }}
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl flex items-center justify-center" style={{ background: 'var(--glass)', border: '1px solid var(--glass-border)' }}>
+                        <Image size={24} style={{ color: 'var(--text-muted)' }} />
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="btn-neon text-xs py-2 px-4 flex items-center gap-2 cursor-pointer">
+                        <Upload size={14} />
+                        <span>{uploadingPhoto ? 'Uploading...' : 'Choose Photo'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleFileUpload(e, (url) => update('tutorImage', url), setUploadingPhoto)}
+                          disabled={uploadingPhoto}
+                        />
+                      </label>
+                      {form.tutorImage && (
+                        <button type="button" onClick={() => update('tutorImage', '')} className="text-xxs" style={{ color: '#ef4444' }}>
+                          Remove Photo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {group.items.map(item => (
                   <div key={item.field}>
@@ -193,24 +233,6 @@ const AddTutorPage: React.FC = () => {
                         min={item.type === 'number' ? '0' : undefined}
                       />
                     </div>
-                    {item.field === 'tutorImage' && (
-                      <div className="mt-2 flex items-center gap-3">
-                        <label className="btn-neon text-xxs py-1.5 px-3 flex items-center gap-1 cursor-pointer">
-                          <Plus size={10} />
-                          <span>Upload Local Image</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => handleFileUpload(e, (url) => update('tutorImage', url), setUploadingPhoto)}
-                          />
-                        </label>
-                        {uploadingPhoto && <span className="text-xs" style={{ color: '#a855f7' }}>Uploading...</span>}
-                        {form.tutorImage && (
-                          <img src={form.tutorImage} className="w-8 h-8 rounded-lg object-cover" style={{ border: '1px solid rgba(168,85,247,0.4)' }} alt="Preview" />
-                        )}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
