@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, SlidersHorizontal, X, GraduationCap } from 'lucide-react';
 import TutorCard from '../components/TutorCard';
-import { subjects } from '../data/mockData';
+import { searchTutors, subjects } from '../data/mockData';
 import type { Tutor } from '../data/mockData';
 import api from '../utils/api';
 import SkeletonCard from '../components/SkeletonCard';
@@ -37,7 +37,9 @@ const TutorsPage: React.FC = () => {
         });
         setTutors(response.data);
       } catch (error) {
-        console.error('Failed to fetch tutors:', error);
+        console.warn('Using local tutors because API is unavailable:', error);
+        setTutors(searchTutors(query, selectedSubject, startDate, endDate)
+          .filter(tutor => selectedMode === 'All' || tutor.teachingMode === selectedMode));
       } finally {
         setLoading(false);
       }
@@ -101,7 +103,7 @@ const TutorsPage: React.FC = () => {
           transition={{ duration: 0.5, delay: 0.2 }}
         >
           {/* Search Bar */}
-          <div className="flex gap-3 mb-4">
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
             <div className="relative flex-1">
               <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
@@ -114,7 +116,7 @@ const TutorsPage: React.FC = () => {
             </div>
             <motion.button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
               style={{
                 background: showFilters ? 'rgba(168,85,247,0.15)' : 'var(--glass)',
                 border: `1px solid ${showFilters ? 'rgba(168,85,247,0.4)' : 'var(--glass-border)'}`,
@@ -132,7 +134,7 @@ const TutorsPage: React.FC = () => {
             {hasFilters && (
               <motion.button
                 onClick={clearFilters}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium"
+                className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium"
                 style={{
                   background: 'rgba(239,68,68,0.1)',
                   border: '1px solid rgba(239,68,68,0.3)',

@@ -100,7 +100,7 @@ const RegisterPage: React.FC = () => {
       <div className="neon-circle" style={{ width: '300px', height: '300px', background: 'radial-gradient(circle, #3b82f6, transparent)', bottom: '-100px', left: '-50px' }} />
 
       <motion.div
-        className="glass-card w-full max-w-md p-8 relative z-10"
+        className="glass-card w-full max-w-md p-5 sm:p-8 relative z-10"
         initial={{ opacity: 0, y: 40, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.7 }}

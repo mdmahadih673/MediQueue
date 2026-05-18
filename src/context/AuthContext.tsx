@@ -40,11 +40,70 @@ const AuthContext = createContext<AuthContextType>({
 
 const TOKEN_KEY = 'mediqueue-token';
 const USER_KEY = 'mediqueue-user';
+const ADMIN_EMAIL = 'mdmahadih673@gmail.com';
+
+const getRole = (email: string | null | undefined, role?: string) =>
+  email?.toLowerCase() === ADMIN_EMAIL ? 'admin' : (role || 'user');
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const saveSession = (authUser: User, authToken: string) => {
+    setUser(authUser);
+    setToken(authToken);
+    localStorage.setItem(USER_KEY, JSON.stringify(authUser));
+    localStorage.setItem(TOKEN_KEY, authToken);
+  };
+
+  const syncWithBackend = async (firebaseUser: {
+    uid: string;
+    email: string | null;
+    displayName: string | null;
+    photoURL: string | null;
+  }): Promise<{ user: User; token: string } | null> => {
+    try {
+      const response = await api.post('/auth/sync', {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName,
+        photoURL: firebaseUser.photoURL
+      });
+
+      const { token: backendToken, name, email, photoURL, uid, role } = response.data;
+      return {
+        token: backendToken,
+        user: { uid, email, displayName: name, photoURL, role: getRole(email, role) }
+      };
+    } catch (error) {
+      console.warn('Backend auth sync unavailable. Using Firebase session only.', error);
+      return null;
+    }
+  };
+
+  const buildFirebaseSession = async (firebaseUser: {
+    uid: string;
+    email: string | null;
+    displayName: string | null;
+    photoURL: string | null;
+    getIdToken?: () => Promise<string>;
+  }): Promise<{ user: User; token: string }> => {
+    const idToken = firebaseUser.getIdToken
+      ? await firebaseUser.getIdToken()
+      : `firebase-${firebaseUser.uid}`;
+
+    return {
+      token: idToken,
+      user: {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'MediQueue User',
+        photoURL: firebaseUser.photoURL,
+        role: getRole(firebaseUser.email),
+      }
+    };
+  };
 
   // Restore session from localStorage on load
   useEffect(() => {
@@ -63,25 +122,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up Firebase auth listener
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        try {
-          // Sync Firebase User with our Express server to refresh JWT
-          const response = await api.post('/auth/sync', {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName,
-            photoURL: firebaseUser.photoURL
-          });
-
-          const { token: backendToken, name, email, photoURL, uid, role } = response.data;
-          const authUser: User = { uid, email, displayName: name, photoURL, role };
-
-          setUser(authUser);
-          setToken(backendToken);
-          localStorage.setItem(USER_KEY, JSON.stringify(authUser));
-          localStorage.setItem(TOKEN_KEY, backendToken);
-        } catch (error) {
-          console.error('Firebase Auth listener sync failed:', error);
-        }
+        const synced = await syncWithBackend(firebaseUser);
+        const session = synced || await buildFirebaseSession(firebaseUser);
+        saveSession(session.user, session.token);
+      } else {
+        setUser(null);
+        setToken(null);
+        localStorage.removeItem(USER_KEY);
+        localStorage.removeItem(TOKEN_KEY);
       }
       setLoading(false);
     });
@@ -96,21 +144,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
 
-      // Sync with Express backend
-      const response = await api.post('/auth/sync', {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        displayName: firebaseUser.displayName,
-        photoURL: firebaseUser.photoURL
-      });
-
-      const { token: backendToken, name, photoURL, uid, role } = response.data;
-      const authUser: User = { uid, email: firebaseUser.email, displayName: name, photoURL, role };
-
-      setUser(authUser);
-      setToken(backendToken);
-      localStorage.setItem(USER_KEY, JSON.stringify(authUser));
-      localStorage.setItem(TOKEN_KEY, backendToken);
+      const synced = await syncWithBackend(firebaseUser);
+      const session = synced || await buildFirebaseSession(firebaseUser);
+      saveSession(session.user, session.token);
 
     } catch (firebaseError: any) {
       console.warn('Firebase login failed, trying Express native auth fallback...', firebaseError.message);
@@ -119,12 +155,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const response = await api.post('/auth/login', { email, password });
         const { token: backendToken, name, photoURL, uid, role } = response.data;
-        const authUser: User = { uid, email, displayName: name, photoURL, role };
-
-        setUser(authUser);
-        setToken(backendToken);
-        localStorage.setItem(USER_KEY, JSON.stringify(authUser));
-        localStorage.setItem(TOKEN_KEY, backendToken);
+        const authUser: User = { uid, email, displayName: name, photoURL, role: getRole(email, role) };
+        saveSession(authUser, backendToken);
       } catch (localError: any) {
         // Return clear, user-friendly error from backend
         throw new Error(localError.response?.data?.message || 'Login failed. Please check your credentials.');
@@ -139,49 +171,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await signInWithPopup(auth, googleProvider);
       const firebaseUser = result.user;
 
-      // Sync with Express backend
-      const response = await api.post('/auth/sync', {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        displayName: firebaseUser.displayName,
-        photoURL: firebaseUser.photoURL
-      });
-
-      const { token: backendToken, name, photoURL, uid, role } = response.data;
-      const authUser: User = { uid, email: firebaseUser.email, displayName: name, photoURL, role };
-
-      setUser(authUser);
-      setToken(backendToken);
-      localStorage.setItem(USER_KEY, JSON.stringify(authUser));
-      localStorage.setItem(TOKEN_KEY, backendToken);
+      const synced = await syncWithBackend(firebaseUser);
+      const session = synced || await buildFirebaseSession(firebaseUser);
+      saveSession(session.user, session.token);
 
     } catch (firebaseError: any) {
-      console.warn('Firebase Google Login failed, running MERN fallback Google sync...', firebaseError.message);
-      
-      // 2. Mock/Simulate login in local mode if Firebase configuration is missing or invalid
-      try {
-        const fallbackUid = `google-${Date.now()}`;
-        const fallbackEmail = `googleuser-${Date.now()}@mediqueue.com`;
-        const fallbackName = 'Google Scholar';
-        const fallbackPhoto = `https://ui-avatars.com/api/?name=Google+Scholar&background=a855f7&color=fff&size=200`;
-
-        const response = await api.post('/auth/sync', {
-          uid: fallbackUid,
-          email: fallbackEmail,
-          displayName: fallbackName,
-          photoURL: fallbackPhoto
-        });
-
-        const { token: backendToken, name, photoURL, uid, role } = response.data;
-        const authUser: User = { uid, email: fallbackEmail, displayName: name, photoURL, role };
-
-        setUser(authUser);
-        setToken(backendToken);
-        localStorage.setItem(USER_KEY, JSON.stringify(authUser));
-        localStorage.setItem(TOKEN_KEY, backendToken);
-      } catch (localError: any) {
-        throw new Error(localError.response?.data?.message || 'Google Login integration failed.');
-      }
+      console.warn('Firebase Google Login failed:', firebaseError.message);
+      throw new Error(firebaseError.message || 'Google Login integration failed.');
     }
   };
 
@@ -199,21 +195,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         photoURL: finalPhoto
       });
 
-      // Sync with Express backend
-      const response = await api.post('/auth/sync', {
+      const synced = await syncWithBackend({
         uid: firebaseUser.uid,
         email: firebaseUser.email,
         displayName: name,
         photoURL: finalPhoto
       });
-
-      const { token: backendToken, uid, role } = response.data;
-      const authUser: User = { uid, email: firebaseUser.email, displayName: name, photoURL: finalPhoto, role };
-
-      setUser(authUser);
-      setToken(backendToken);
-      localStorage.setItem(USER_KEY, JSON.stringify(authUser));
-      localStorage.setItem(TOKEN_KEY, backendToken);
+      const session = synced || await buildFirebaseSession({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: name,
+        photoURL: finalPhoto,
+        getIdToken: () => firebaseUser.getIdToken()
+      });
+      saveSession(session.user, session.token);
 
     } catch (firebaseError: any) {
       console.warn('Firebase registration failed, trying Express native auth fallback...', firebaseError.message);
@@ -228,12 +223,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
 
         const { token: backendToken, name: resName, photoURL: resPhoto, uid, role } = response.data;
-        const authUser: User = { uid, email, displayName: resName, photoURL: resPhoto, role };
-
-        setUser(authUser);
-        setToken(backendToken);
-        localStorage.setItem(USER_KEY, JSON.stringify(authUser));
-        localStorage.setItem(TOKEN_KEY, backendToken);
+        const authUser: User = { uid, email, displayName: resName, photoURL: resPhoto, role: getRole(email, role) };
+        saveSession(authUser, backendToken);
       } catch (localError: any) {
         throw new Error(localError.response?.data?.message || 'Registration failed. Email might already be taken.');
       }

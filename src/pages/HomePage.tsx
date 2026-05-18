@@ -7,7 +7,7 @@ import 'swiper/css';
 import 'swiper/css/pagination';
 import HeroSection from '../components/HeroSection';
 import TutorCard from '../components/TutorCard';
-import { testimonials } from '../data/mockData';
+import { getTutors, testimonials } from '../data/mockData';
 import type { Tutor } from '../data/mockData';
 import api from '../utils/api';
 import SkeletonCard from '../components/SkeletonCard';
@@ -53,7 +53,8 @@ const HomePage: React.FC = () => {
         const res = await api.get('/tutors/featured');
         setTutors(res.data);
       } catch (err) {
-        console.error('Failed to fetch featured tutors:', err);
+        console.warn('Using local featured tutors because API is unavailable:', err);
+        setTutors(getTutors().slice(0, 6));
       } finally {
         setLoading(false);
       }

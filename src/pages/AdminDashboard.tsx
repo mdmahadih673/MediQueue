@@ -250,7 +250,7 @@ const AdminDashboard: React.FC = () => {
         {/* Controls Bar */}
         <div className="glass-card p-4 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* Tabs */}
-          <div className="flex bg-slate-900/50 p-1.5 rounded-xl border border-slate-800/80 w-fit">
+          <div className="flex bg-slate-900/50 p-1.5 rounded-xl border border-slate-800/80 w-full md:w-fit overflow-x-auto scrollbar-hide">
             {[
               { id: 'tutors', label: 'Tutors', icon: <GraduationCap size={14} /> },
               { id: 'bookings', label: 'Bookings', icon: <Calendar size={14} /> },
@@ -259,7 +259,7 @@ const AdminDashboard: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id as any); setSearchQuery(''); }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-300 whitespace-nowrap ${
                   activeTab === tab.id 
                     ? 'text-white' 
                     : 'text-slate-400 hover:text-slate-200'
@@ -276,7 +276,7 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           {/* Search Input */}
-          <div className="flex gap-2.5 items-center flex-1 max-w-md w-full ml-auto">
+          <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center flex-1 max-w-md w-full ml-auto">
             <div className="relative flex-1">
               <Search size={16} style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
@@ -295,7 +295,7 @@ const AdminDashboard: React.FC = () => {
             </div>
             {activeTab === 'tutors' && (
               <select
-                className="input text-xs py-2 max-w-36"
+                className="input text-xs py-2 sm:max-w-36"
                 value={selectedSubject}
                 onChange={e => setSelectedSubject(e.target.value)}
               >
