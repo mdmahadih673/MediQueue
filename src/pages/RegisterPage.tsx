@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { Eye, EyeOff, Mail, Lock, User, Image, GraduationCap, CheckCircle, XCircle, Upload } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
-import api from '../utils/api';
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24">
@@ -34,17 +33,14 @@ const RegisterPage: React.FC = () => {
     }
     setUploadingPhoto(true);
     const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const res = await api.post('/upload', { base64Data: reader.result, fileName: file.name });
-        const serverUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : window.location.origin;
-        updateField('photoURL', `${serverUrl}${res.data.fileUrl}`);
-        toast.success('Photo uploaded! 📸');
-      } catch {
-        toast.error('Failed to upload photo.');
-      } finally {
-        setUploadingPhoto(false);
-      }
+    reader.onload = () => {
+      updateField('photoURL', String(reader.result || ''));
+      toast.success('Photo selected!');
+      setUploadingPhoto(false);
+    };
+    reader.onerror = () => {
+      toast.error('Failed to read photo.');
+      setUploadingPhoto(false);
     };
     reader.readAsDataURL(file);
   };

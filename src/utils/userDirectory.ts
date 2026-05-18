@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDoc,
   onSnapshot,
   serverTimestamp,
   setDoc,
@@ -35,11 +36,13 @@ export const toDirectoryUser = (user: User): DirectoryUser => ({
 
 export const saveDirectoryUser = async (user: User) => {
   if (!user.uid || !user.email) return;
+  const userRef = doc(db, 'users', user.uid);
+  const existingUser = await getDoc(userRef);
 
-  await setDoc(doc(db, 'users', user.uid), {
+  await setDoc(userRef, {
     ...toDirectoryUser(user),
     updatedAt: serverTimestamp(),
-    createdAt: serverTimestamp(),
+    createdAt: existingUser.exists() ? existingUser.data().createdAt : serverTimestamp(),
   }, { merge: true });
 };
 

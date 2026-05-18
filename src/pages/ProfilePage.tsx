@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { GraduationCap, BookOpen, Calendar, Star, Mail, Edit, Image, Save, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getUserTutors, getUserBookings } from '../data/mockData';
+import { uploadProfilePhoto } from '../utils/uploadProfilePhoto';
 import { toast } from 'react-toastify';
 
 const ProfilePage: React.FC = () => {
@@ -12,6 +13,7 @@ const ProfilePage: React.FC = () => {
   const { user, updateUserProfile } = useAuth();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [profileName, setProfileName] = useState(user?.displayName || '');
   const [profilePhoto, setProfilePhoto] = useState(user?.photoURL || '');
   const myTutors = getUserTutors(user?.email || '');
@@ -23,22 +25,35 @@ const ProfilePage: React.FC = () => {
     setProfilePhoto(user?.photoURL || '');
   }, [user]);
 
-  const handlePhotoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please choose an image file.');
-      return;
-    }
+    if (!file || !user?.uid) return;
 
-    const reader = new FileReader();
-    reader.onload = () => setProfilePhoto(String(reader.result || ''));
-    reader.readAsDataURL(file);
+    setUploading(true);
+    try {
+      const photoURL = await uploadProfilePhoto(user.uid, file);
+      setProfilePhoto(photoURL);
+      toast.success('Photo uploaded successfully.');
+    } catch (error) {
+      toast.error((error as Error).message || 'Failed to upload photo.');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setProfilePhoto('');
   };
 
   const handleSaveProfile = async () => {
     if (!profileName.trim()) {
       toast.error('Name cannot be empty.');
+      return;
+    }
+
+    if (uploading) {
+      toast.info('Please wait until the photo upload finishes.');
       return;
     }
 
@@ -158,26 +173,39 @@ const ProfilePage: React.FC = () => {
                   placeholder="Your name"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Profile Photo URL</label>
-                <input
-                  className="input"
-                  value={profilePhoto}
-                  onChange={(e) => setProfilePhoto(e.target.value)}
-                  placeholder="https://example.com/photo.jpg"
+              <div className="flex items-center gap-3">
+                <img
+                  src={profilePhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(profileName || 'U')}&background=a855f7&color=fff&size=200`}
+                  alt="Profile preview"
+                  className="w-16 h-16 rounded-2xl object-cover"
+                  style={{ border: '2px solid rgba(168,85,247,0.35)' }}
                 />
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Profile Picture</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Any size image from your device</p>
+                </div>
               </div>
               <div className="md:col-span-2 flex flex-col sm:flex-row gap-3">
                 <label className="px-4 py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
                   style={{ background: 'var(--glass)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)' }}>
                   <Image size={16} />
-                  Upload Photo
-                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoFile} />
+                  {uploading ? 'Uploading...' : 'Choose Photo From Device'}
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoFile} disabled={uploading} />
                 </label>
+                {profilePhoto && (
+                  <button
+                    type="button"
+                    onClick={handleRemovePhoto}
+                    className="px-4 py-3 rounded-xl text-sm font-semibold"
+                    style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444' }}
+                  >
+                    Remove Photo
+                  </button>
+                )}
                 <motion.button
                   type="button"
                   onClick={handleSaveProfile}
-                  disabled={saving}
+                  disabled={saving || uploading}
                   className="btn-neon px-5 py-3 text-sm flex items-center justify-center gap-2"
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
