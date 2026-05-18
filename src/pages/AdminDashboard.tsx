@@ -3,10 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Shield, Users, GraduationCap, Calendar, Clock, MapPin, DollarSign,
-  Layers, Search, SlidersHorizontal, Trash2, Pencil, X, Check, BookOpen, AlertCircle
+  Layers, Search, Trash2, Pencil, X, Check, BookOpen
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { subjects } from '../data/mockData';
+import { cancelBooking, deleteTutor, getBookings, getTutors, subjects, updateTutor } from '../data/mockData';
 import type { Tutor, Booking } from '../data/mockData';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
@@ -41,6 +41,7 @@ const AdminDashboard: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [usingLocalData, setUsingLocalData] = useState(false);
 
   // Search/Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,9 +65,21 @@ const AdminDashboard: React.FC = () => {
       // Fetch Users
       const usersRes = await api.get('/auth/users');
       setUsers(usersRes.data);
+      setUsingLocalData(false);
     } catch (err) {
-      console.error('Error fetching admin data:', err);
-      toast.error('Failed to load administrative data.');
+      console.warn('Admin API unavailable. Loading local dashboard data.', err);
+      const localUser: AdminUser | null = user ? {
+        uid: user.uid,
+        name: user.displayName || user.email?.split('@')[0] || 'Admin',
+        email: user.email || 'admin@mediqueue.com',
+        photoURL: user.photoURL || undefined,
+        createdAt: new Date().toISOString(),
+      } : null;
+
+      setTutors(getTutors());
+      setBookings(getBookings());
+      setUsers(localUser ? [localUser] : []);
+      setUsingLocalData(true);
     } finally {
       setLoading(false);
     }
@@ -97,6 +110,14 @@ const AdminDashboard: React.FC = () => {
   const handleUpdateTutor = async () => {
     if (!editTutor) return;
     try {
+      if (usingLocalData) {
+        const updated = updateTutor(editTutor._id, editForm);
+        if (!updated) throw new Error('Tutor not found.');
+        toast.success(`Successfully updated tutor ${editTutor.tutorName}!`);
+        setEditTutor(null);
+        fetchData();
+        return;
+      }
       await api.put(`/tutors/${editTutor._id}`, editForm);
       toast.success(`Successfully updated tutor ${editTutor.tutorName}!`);
       setEditTutor(null);
@@ -122,6 +143,12 @@ const AdminDashboard: React.FC = () => {
 
     if (result.isConfirmed) {
       try {
+        if (usingLocalData) {
+          deleteTutor(tutor._id);
+          toast.success(`Successfully removed tutor ${tutor.tutorName}.`);
+          fetchData();
+          return;
+        }
         await api.delete(`/tutors/${tutor._id}`);
         toast.success(`Successfully removed tutor ${tutor.tutorName}.`);
         fetchData();
@@ -148,6 +175,12 @@ const AdminDashboard: React.FC = () => {
 
     if (result.isConfirmed) {
       try {
+        if (usingLocalData) {
+          cancelBooking(booking._id);
+          toast.success('Student booking cancelled successfully.');
+          fetchData();
+          return;
+        }
         await api.patch(`/bookings/${booking._id}/cancel`);
         toast.success('Student booking cancelled successfully.');
         fetchData();
@@ -213,7 +246,9 @@ const AdminDashboard: React.FC = () => {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
             </span>
-            <span className="text-xs font-semibold text-emerald-400">Database Engine Live</span>
+            <span className="text-xs font-semibold text-emerald-400">
+              {usingLocalData ? 'Local Data Mode' : 'Database Engine Live'}
+            </span>
           </div>
         </motion.div>
 
