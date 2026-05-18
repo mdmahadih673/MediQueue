@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getDatabase } from 'firebase/database';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -12,6 +12,7 @@ const firebaseConfig = {
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '206561058404',
   appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:206561058404:web:e7080b0c66487dac5c4971',
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-CK9LQ2J180',
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || 'https://mediqueue-146e6-default-rtdb.asia-southeast1.firebasedatabase.app',
 };
 
 const missingFirebaseKeys = Object.entries(firebaseConfig)
@@ -26,7 +27,7 @@ if (missingFirebaseKeys.length > 0) {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db = getDatabase(app);
 const storage = getStorage(app);
 const googleProvider = new GoogleAuthProvider();
 const analytics = isSupported().then((supported) => supported ? getAnalytics(app) : null);

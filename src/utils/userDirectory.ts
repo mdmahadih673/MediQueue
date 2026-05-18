@@ -1,12 +1,11 @@
 import {
-  collection,
-  doc,
-  getDoc,
-  onSnapshot,
+  get,
+  onValue,
+  ref,
   serverTimestamp,
-  setDoc,
+  update,
   type Unsubscribe,
-} from 'firebase/firestore';
+} from 'firebase/database';
 import { db } from '../lib/firebase';
 import type { User } from '../context/AuthContext';
 
@@ -36,41 +35,41 @@ export const toDirectoryUser = (user: User): DirectoryUser => ({
 
 export const saveDirectoryUser = async (user: User) => {
   if (!user.uid || !user.email) return;
-  const userRef = doc(db, 'users', user.uid);
-  const existingUser = await getDoc(userRef);
+  const userRef = ref(db, `users/${user.uid}`);
+  const existingUser = await get(userRef);
 
-  await setDoc(userRef, {
+  await update(userRef, {
     ...toDirectoryUser(user),
     updatedAt: serverTimestamp(),
-    createdAt: existingUser.exists() ? existingUser.data().createdAt : serverTimestamp(),
-  }, { merge: true });
+    createdAt: existingUser.exists() ? existingUser.val().createdAt : serverTimestamp(),
+  });
 };
 
 export const markUserPresence = async (user: User, online: boolean) => {
   if (!user.uid || !user.email) return;
 
-  await setDoc(doc(db, 'users', user.uid), {
+  await update(ref(db, `users/${user.uid}`), {
     ...toDirectoryUser(user),
     online,
     lastSeen: Date.now(),
     updatedAt: serverTimestamp(),
-  }, { merge: true });
+  });
 };
 
 export const subscribeDirectoryUsers = (
   fallbackUser: User | null,
-  onChange: (users: DirectoryUser[], onlineCount: number, usingFirestore: boolean) => void
+  onChange: (users: DirectoryUser[], onlineCount: number, usingRealtimeDatabase: boolean) => void
 ): Unsubscribe => {
-  return onSnapshot(
-    collection(db, 'users'),
+  return onValue(
+    ref(db, 'users'),
     (snapshot) => {
-      const users = snapshot.docs.map((item) => {
-        const data = item.data() as DirectoryUser;
-        const lastSeen = Number(data.lastSeen || 0);
+      const data = snapshot.val() as Record<string, DirectoryUser> | null;
+      const users = Object.entries(data || {}).map(([uid, item]) => {
+        const lastSeen = Number(item.lastSeen || 0);
         return {
-          ...data,
-          uid: data.uid || item.id,
-          online: Boolean(data.online && Date.now() - lastSeen < ONLINE_WINDOW_MS),
+          ...item,
+          uid: item.uid || uid,
+          online: Boolean(item.online && lastSeen && Date.now() - lastSeen < ONLINE_WINDOW_MS),
         };
       });
       const onlineCount = users.filter((item) => item.online).length;
