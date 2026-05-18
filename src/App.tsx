@@ -92,6 +92,14 @@ const AppRoutes: React.FC = () => {
             </PrivateRoute>
           }
         />
+        <Route
+          path="/admin/:section"
+          element={
+            <PrivateRoute>
+              <PageWrapper><AdminDashboard /></PageWrapper>
+            </PrivateRoute>
+          }
+        />
         <Route path="*" element={<PageWrapper><NotFoundPage /></PageWrapper>} />
       </Routes>
     </AnimatePresence>

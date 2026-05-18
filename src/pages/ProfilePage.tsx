@@ -1,17 +1,58 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { GraduationCap, BookOpen, Calendar, Star, Mail, Edit } from 'lucide-react';
+import { GraduationCap, BookOpen, Calendar, Star, Mail, Edit, Image, Save, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getUserTutors, getUserBookings } from '../data/mockData';
+import { toast } from 'react-toastify';
 
 const ProfilePage: React.FC = () => {
   useEffect(() => { document.title = 'MediQueue – Profile'; }, []);
 
-  const { user } = useAuth();
+  const { user, updateUserProfile } = useAuth();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [profileName, setProfileName] = useState(user?.displayName || '');
+  const [profilePhoto, setProfilePhoto] = useState(user?.photoURL || '');
   const myTutors = getUserTutors(user?.email || '');
   const myBookings = getUserBookings(user?.email || '');
   const activeBookings = myBookings.filter(b => b.bookingStatus !== 'cancelled');
+
+  useEffect(() => {
+    setProfileName(user?.displayName || '');
+    setProfilePhoto(user?.photoURL || '');
+  }, [user]);
+
+  const handlePhotoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => setProfilePhoto(String(reader.result || ''));
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!profileName.trim()) {
+      toast.error('Name cannot be empty.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updateUserProfile(profileName.trim(), profilePhoto.trim());
+      toast.success('Profile updated successfully.');
+      setEditing(false);
+    } catch (error) {
+      toast.error((error as Error).message || 'Failed to update profile.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const stats = [
     { label: 'Tutors Added', value: myTutors.length, icon: <GraduationCap size={20} />, color: '#a855f7', bg: 'rgba(168,85,247,0.1)' },
@@ -67,26 +108,86 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
 
-            <Link to={user?.role === 'admin' ? "/add-tutor" : "/tutors"}>
+            <div className="flex flex-col sm:flex-row gap-2">
               <motion.button
-                className="btn-neon px-4 py-2 text-sm flex items-center gap-2"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                type="button"
+                onClick={() => setEditing(!editing)}
+                className="px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                style={{ background: 'var(--glass)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)' }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
               >
-                {user?.role === 'admin' ? (
-                  <>
-                    <Edit size={14} />
-                    <span>Add Tutor</span>
-                  </>
-                ) : (
-                  <>
-                    <GraduationCap size={14} />
-                    <span>Book a Tutor</span>
-                  </>
-                )}
+                {editing ? <X size={14} /> : <Edit size={14} />}
+                <span>{editing ? 'Cancel Edit' : 'Edit Profile'}</span>
               </motion.button>
-            </Link>
+              <Link to={user?.role === 'admin' ? "/add-tutor" : "/tutors"}>
+                <motion.button
+                  className="btn-neon px-4 py-2 text-sm flex items-center justify-center gap-2 w-full"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {user?.role === 'admin' ? (
+                    <>
+                      <Edit size={14} />
+                      <span>Add Tutor</span>
+                    </>
+                  ) : (
+                    <>
+                      <GraduationCap size={14} />
+                      <span>Book a Tutor</span>
+                    </>
+                  )}
+                </motion.button>
+              </Link>
+            </div>
           </div>
+
+          {editing && (
+            <motion.div
+              className="mt-6 pt-6 grid grid-cols-1 md:grid-cols-2 gap-4"
+              style={{ borderTop: '1px solid var(--glass-border)' }}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <div>
+                <label className="block text-xs font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Display Name</label>
+                <input
+                  className="input"
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  placeholder="Your name"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Profile Photo URL</label>
+                <input
+                  className="input"
+                  value={profilePhoto}
+                  onChange={(e) => setProfilePhoto(e.target.value)}
+                  placeholder="https://example.com/photo.jpg"
+                />
+              </div>
+              <div className="md:col-span-2 flex flex-col sm:flex-row gap-3">
+                <label className="px-4 py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                  style={{ background: 'var(--glass)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)' }}>
+                  <Image size={16} />
+                  Upload Photo
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoFile} />
+                </label>
+                <motion.button
+                  type="button"
+                  onClick={handleSaveProfile}
+                  disabled={saving}
+                  className="btn-neon px-5 py-3 text-sm flex items-center justify-center gap-2"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  <Save size={16} />
+                  <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+                </motion.button>
+              </div>
+            </motion.div>
+          )}
         </motion.div>
 
         {/* Stats */}

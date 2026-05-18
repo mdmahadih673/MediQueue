@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyBF-3w3KYCcrZL5HGuzniv2tdueCqE5X8A',
@@ -24,7 +25,8 @@ if (missingFirebaseKeys.length > 0) {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
+const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 const analytics = isSupported().then((supported) => supported ? getAnalytics(app) : null);
 
-export { app, auth, googleProvider, analytics };
+export { app, auth, db, googleProvider, analytics };

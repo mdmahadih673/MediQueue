@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useParams } from 'react-router-dom';
 import {
   Shield, Users, GraduationCap, Calendar, Clock, MapPin, DollarSign,
   Layers, Search, Trash2, Pencil, X, Check, BookOpen
@@ -8,17 +8,12 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { cancelBooking, deleteTutor, getBookings, getTutors, subjects, updateTutor } from '../data/mockData';
 import type { Tutor, Booking } from '../data/mockData';
+import { subscribeDirectoryUsers, type DirectoryUser } from '../utils/userDirectory';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import api from '../utils/api';
 
-interface AdminUser {
-  uid: string;
-  name: string;
-  email: string;
-  photoURL?: string;
-  createdAt?: string;
-}
+type AdminUser = DirectoryUser;
 
 const AdminDashboard: React.FC = () => {
   useEffect(() => {
@@ -27,6 +22,7 @@ const AdminDashboard: React.FC = () => {
 
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { section } = useParams();
 
   // Redirect if not admin
   useEffect(() => {
@@ -42,6 +38,7 @@ const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [usingLocalData, setUsingLocalData] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState(0);
 
   // Search/Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -62,9 +59,6 @@ const AdminDashboard: React.FC = () => {
       const bookingsRes = await api.get('/bookings');
       setBookings(bookingsRes.data);
 
-      // Fetch Users
-      const usersRes = await api.get('/auth/users');
-      setUsers(usersRes.data);
       setUsingLocalData(false);
     } catch (err) {
       console.warn('Admin API unavailable. Loading local dashboard data.', err);
@@ -74,11 +68,15 @@ const AdminDashboard: React.FC = () => {
         email: user.email || 'admin@mediqueue.com',
         photoURL: user.photoURL || undefined,
         createdAt: new Date().toISOString(),
+        role: user.role || 'admin',
+        online: true,
+        lastSeen: Date.now(),
       } : null;
 
       setTutors(getTutors());
       setBookings(getBookings());
       setUsers(localUser ? [localUser] : []);
+      setOnlineUsers(localUser ? 1 : 0);
       setUsingLocalData(true);
     } finally {
       setLoading(false);
@@ -89,6 +87,22 @@ const AdminDashboard: React.FC = () => {
     if (user && user.role === 'admin') {
       fetchData();
     }
+  }, [user]);
+
+  useEffect(() => {
+    if (section === 'users' || section === 'bookings' || section === 'tutors') {
+      setActiveTab(section);
+    }
+  }, [section]);
+
+  useEffect(() => {
+    if (!user || user.role !== 'admin') return;
+
+    return subscribeDirectoryUsers(user, (directoryUsers, onlineCount, usingFirestore) => {
+      setUsers(directoryUsers);
+      setOnlineUsers(onlineCount);
+      setUsingLocalData(!usingFirestore);
+    });
   }, [user]);
 
   // Tutor handlers
@@ -254,7 +268,7 @@ const AdminDashboard: React.FC = () => {
 
         {/* Stats Section */}
         <motion.div 
-          className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10"
+          className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -263,6 +277,7 @@ const AdminDashboard: React.FC = () => {
             { label: 'Total Tutors', value: tutors.length, icon: <GraduationCap size={24} style={{ color: '#a855f7' }} />, color: '#a855f7' },
             { label: 'Total Bookings', value: bookings.length, icon: <Calendar size={24} style={{ color: '#3b82f6' }} />, color: '#3b82f6' },
             { label: 'Registered Users', value: users.length, icon: <Users size={24} style={{ color: '#06b6d4' }} />, color: '#06b6d4' },
+            { label: 'Online Now', value: onlineUsers, icon: <Shield size={24} style={{ color: '#22c55e' }} />, color: '#22c55e' },
           ].map(stat => (
             <div key={stat.label} className="glass-card p-6 flex items-center justify-between relative overflow-hidden group">
               <div className="absolute right-0 top-0 w-24 h-24 rounded-full opacity-10 group-hover:scale-125 transition-transform duration-500" 
@@ -575,7 +590,8 @@ const AdminDashboard: React.FC = () => {
                           <th>User</th>
                           <th>Email</th>
                           <th>Firebase UID</th>
-                          <th>Registration Date</th>
+                          <th>Status</th>
+                          <th>Last Seen</th>
                           <th>Default Role</th>
                         </tr>
                       </thead>
@@ -590,7 +606,14 @@ const AdminDashboard: React.FC = () => {
                             </td>
                             <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{u.email}</td>
                             <td className="text-xs" style={{ color: 'var(--text-muted)' }}><code>{u.uid}</code></td>
-                            <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</td>
+                            <td>
+                              <span className="text-xxs px-2.5 py-0.5 rounded-full font-semibold" style={{
+                                background: u.online ? 'rgba(34,197,94,0.12)' : 'rgba(71,85,105,0.12)',
+                                color: u.online ? '#22c55e' : '#94a3b8',
+                                border: `1px solid ${u.online ? 'rgba(34,197,94,0.25)' : 'rgba(71,85,105,0.25)'}`
+                              }}>{u.online ? 'Online' : 'Offline'}</span>
+                            </td>
+                            <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{u.lastSeen ? new Date(u.lastSeen).toLocaleString() : 'N/A'}</td>
                             <td>
                               <span className="text-xxs px-2.5 py-0.5 rounded-full font-semibold" style={{
                                 background: u.email === 'mdmahadih673@gmail.com' ? 'rgba(168,85,247,0.12)' : 'rgba(71,85,105,0.12)',
@@ -613,7 +636,8 @@ const AdminDashboard: React.FC = () => {
                           <div>
                             <h4 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{u.name}</h4>
                             <p className="text-xxs" style={{ color: 'var(--text-muted)' }}>{u.email}</p>
-                            <p className="text-xxs mt-0.5" style={{ color: 'var(--text-muted)' }}>Registered: {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</p>
+                            <p className="text-xxs mt-0.5" style={{ color: 'var(--text-muted)' }}>Last seen: {u.lastSeen ? new Date(u.lastSeen).toLocaleString() : 'N/A'}</p>
+                            <p className="text-xxs mt-0.5" style={{ color: u.online ? '#22c55e' : 'var(--text-muted)' }}>{u.online ? 'Online now' : 'Offline'}</p>
                             <span className="inline-block mt-1 text-xxs px-2 py-0.5 rounded-full font-semibold" style={{
                               background: u.email === 'mdmahadih673@gmail.com' ? 'rgba(168,85,247,0.12)' : 'rgba(71,85,105,0.12)',
                               color: u.email === 'mdmahadih673@gmail.com' ? '#a855f7' : '#94a3b8'

@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import api from '../utils/api';
+import { markUserPresence, saveDirectoryUser } from '../utils/userDirectory';
 
 export interface User {
   uid: string;
@@ -25,6 +26,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   register: (name: string, email: string, password: string, photoURL?: string) => Promise<void>;
+  updateUserProfile: (name: string, photoURL: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -35,6 +37,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   loginWithGoogle: async () => {},
   register: async () => {},
+  updateUserProfile: async () => {},
   logout: async () => {},
 });
 
@@ -55,6 +58,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(authToken);
     localStorage.setItem(USER_KEY, JSON.stringify(authUser));
     localStorage.setItem(TOKEN_KEY, authToken);
+    saveDirectoryUser(authUser).catch((error) => {
+      console.warn('Could not update Firebase user directory:', error);
+    });
   };
 
   const syncWithBackend = async (firebaseUser: {
@@ -136,6 +142,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    markUserPresence(user, true).catch(() => {});
+    const heartbeat = window.setInterval(() => {
+      markUserPresence(user, true).catch(() => {});
+    }, 30000);
+
+    const markOffline = () => {
+      markUserPresence(user, false).catch(() => {});
+    };
+
+    window.addEventListener('beforeunload', markOffline);
+    return () => {
+      window.clearInterval(heartbeat);
+      window.removeEventListener('beforeunload', markOffline);
+      markOffline();
+    };
+  }, [user]);
 
   // Standard Email/Password login
   const login = async (email: string, password: string): Promise<void> => {
@@ -231,9 +257,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateUserProfile = async (name: string, photoURL: string): Promise<void> => {
+    if (!user || !auth.currentUser) {
+      throw new Error('Please login again to update your profile.');
+    }
+
+    await updateProfile(auth.currentUser, {
+      displayName: name,
+      photoURL: photoURL || null,
+    });
+
+    const updatedUser: User = {
+      ...user,
+      displayName: name,
+      photoURL: photoURL || null,
+      role: getRole(user.email, user.role),
+    };
+
+    const freshToken = await auth.currentUser.getIdToken(true);
+    saveSession(updatedUser, freshToken);
+  };
+
   // Sign out
   const logout = async (): Promise<void> => {
     try {
+      if (user) {
+        await markUserPresence(user, false);
+      }
       await signOut(auth);
     } catch (e) {
       console.warn('Firebase logout warning:', e);
@@ -247,7 +297,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, token, login, loginWithGoogle, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, token, login, loginWithGoogle, register, updateUserProfile, logout }}>
       {children}
     </AuthContext.Provider>
   );
