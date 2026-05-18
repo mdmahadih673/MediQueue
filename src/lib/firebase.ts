@@ -3,13 +3,13 @@ import { getAnalytics, isSupported } from 'firebase/analytics';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyBF-3w3KYCcrZL5HGuzniv2tdueCqE5X8A',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'mediqueue-146e6.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'mediqueue-146e6',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'mediqueue-146e6.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '206561058404',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:206561058404:web:e7080b0c66487dac5c4971',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-CK9LQ2J180',
 };
 
 const missingFirebaseKeys = Object.entries(firebaseConfig)
